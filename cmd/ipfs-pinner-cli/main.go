@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,7 +17,7 @@ var secret = os.Getenv("PINNER_API_TOKEN")
 var apiAddress = flag.String("addr", "ws://localhost:5050/websocket", "http service address")
 var filesInfoPath = flag.String("file", "", "JSON file with upload info")
 
-func pinFiles(addr string, filesMetadata []byte) error {
+func pinFiles(addr string, filesMetadata map[string]string) error {
 	header := map[string][]string{
 		"Authorization": {fmt.Sprintf("Bearer %v", secret)},
 	}
@@ -27,9 +28,18 @@ func pinFiles(addr string, filesMetadata []byte) error {
 	}
 	defer c.Close()
 
-	c.WriteMessage(websocket.BinaryMessage, filesMetadata)
-	if err != nil {
-		return err
+	for fileName, fileURL := range filesMetadata {
+		// this is just to create one request per file
+		// to make sure the server process them in parallel
+		// actually...I am not sure this is needed
+		message, _ := json.Marshal(map[string]string{
+			fileName: fileURL,
+		})
+
+		c.WriteMessage(websocket.BinaryMessage, message)
+		if err != nil {
+			return err
+		}
 	}
 
 	for i := 0; i < len(filesMetadata); i++ {
@@ -68,7 +78,13 @@ func main() {
 		log.Fatal("filed to read metadata file:", err)
 	}
 
-	err = pinFiles(*apiAddress, fileContent)
+	filesMetadata := make(map[string]string, 0)
+	err = json.Unmarshal(fileContent, &filesMetadata)
+	if err != nil {
+		log.Fatal("failed to parse file:", err)
+	}
+
+	err = pinFiles(*apiAddress, filesMetadata)
 	if err != nil {
 		log.Fatal("failed to pin:", err)
 	}

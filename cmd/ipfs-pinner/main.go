@@ -248,6 +248,7 @@ func wsConnManager(c *websocket.Conn, writeChan chan []byte, readChan chan []byt
 				if msg == nil {
 					return
 				}
+				log.Println("sending result to client")
 				err := c.WriteMessage(websocket.BinaryMessage, msg)
 				if err != nil {
 					log.Println("failed to write msg to ws conn:", err)
@@ -260,7 +261,9 @@ func wsConnManager(c *websocket.Conn, writeChan chan []byte, readChan chan []byt
 		mt, message, err := c.ReadMessage()
 		if err != nil {
 			log.Println("failed to read message from conn", err)
-			continue
+			close(readChan)
+			close(writeChan)
+			return
 		}
 		if mt == websocket.CloseMessage {
 			log.Println("connection closed remotely")
@@ -301,7 +304,7 @@ func handlerWebsocket(w http.ResponseWriter, r *http.Request) {
 
 	go wsConnManager(c, writeChan, readChan)
 	go wsReader(readChan, fileChan)
-	go wsWriter(readChan, hashChan)
+	go wsWriter(writeChan, hashChan)
 
 	processingDone := make(chan struct{}, 0)
 	go func() {
@@ -312,7 +315,7 @@ func handlerWebsocket(w http.ResponseWriter, r *http.Request) {
 					processingDone <- struct{}{}
 					return
 				}
-				processFile(file.Name, file.URL, hashChan)
+				go processFile(file.Name, file.URL, hashChan)
 			}
 		}
 	}()
