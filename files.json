@@ -1,0 +1,4 @@
+{
+  "focal-rootfs.tar.gz.zip": "https://api.github.com/repos/gjolly/build-pipeline/actions/artifacts/407020103/zip",
+  "jammy-rootfs.tar.gz.zip": "https://api.github.com/repos/gjolly/build-pipeline/actions/artifacts/407020108/zip"
+}
